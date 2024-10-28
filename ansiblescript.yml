@@ -6,12 +6,13 @@
   vars:
     timestamp: "{{ lookup('pipe', 'TZ=Asia/Jakarta date +\"%Y-%m-%d %H:%M:%S %Z\"') }}"
     current_date: "{{ lookup('pipe', 'TZ=Asia/Jakarta date +\"%Y-%m-%d\"') }}"
-    report_file: "./result_{{ current_date }}.csv"
+    report_file: "./result_{{ current_date }}.csv" #Sesuaikan path dan format nama report yang diinginkan
+    sites_file: "./sites.csv" #Sesuaikan path client sites yang dituju
   tasks:
     - name: Read Input Client Sites #Membaca file csv berisi info client site
       read_csv:
-        path: ./sites.csv
-      register: sites_file
+        path: "{{ sites_file }}"
+      register: client_sites
 
     - name: Check if the CSV file exists #Mengecek ketersediaan untuk report file
       stat:
@@ -30,7 +31,7 @@
       routeros_command:
         commands: "/tool bandwidth-test address={{ item.site_ip }} protocol=tcp direction=both user={{ item.site_user }} password={{ item.site_pass }} duration=10s"
       register: bandwidth_test_output
-      with_items: "{{ sites_file.list }}" #Mengambil variabel data dari file input client sites
+      with_items: "{{ client_sites.list }}" #Mengambil variabel data dari file input client sites
       ignore_errors: yes #Apabila error/client sites rto, tetap berjalan untuk test client sites berikutnya
 
 #    - name: Display raw bandwidth test results #Menampilkan raw bw test
