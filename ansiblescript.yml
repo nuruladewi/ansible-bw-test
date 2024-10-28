@@ -1,32 +1,32 @@
 ---
 - name: Bandwidth Test from MikroTik and Save Results
-  hosts: r-core #Setting router hosts
+  hosts: r-core  # Setting router hosts
   connection: network_cli
   gather_facts: no
   tasks:
-    - name: Initialize timestamp variable #Pengambilan timestamp untuk variabel report di dalam csv output file
+    - name: Initialize timestamp variable
       set_fact:
         current_timestamp: "{{ lookup('pipe', 'TZ=Asia/Jakarta date +\"%Y-%m-%d %H:%M:%S %Z\"') }}"
 
-    - name: Get current date for filename #Pengambilan tanggal untuk penamaan file report csv perhari
+    - name: Get current date for filename
       set_fact:
         current_date: "{{ lookup('pipe', 'TZ=Asia/Jakarta date +\"%Y-%m-%d\"') }}"
 
-    - name: Set Output CSV filename #Penamaan file CSV
+    - name: Set Output CSV filename
       set_fact:
         csv_filename: "./result_{{ current_date }}.csv"
 
-    - name: Read Input Client Sites #Membaca file csv berisi info client site
+    - name: Read Input Client Sites
       read_csv:
         path: ./sites.csv
       register: csv_data
 
-    - name: Check if the CSV file exists #Mengecek ketersediaan untuk report file
+    - name: Check if the CSV file exists
       stat:
         path: "{{ csv_filename }}"
       register: csv_file_stat
 
-    - name: Add CSV header if file does not exist #Menambahkan header pada file csv
+    - name: Add CSV header if file does not exist
       lineinfile:
         path: "{{ csv_filename }}"
         line: "Timestamp, Nama site, IP Address, TX Total Average, RX Total Average, Status Average"
@@ -34,34 +34,35 @@
         insertafter: EOF
       when: not csv_file_stat.stat.exists
 
-    - name: Run bandwidth test from Router #Menjalankan tes bw dari router core
+    - name: Run bandwidth test from Router
       routeros_command:
         commands: "/tool bandwidth-test address={{ item.site_ip }} protocol=tcp direction=both user={{ item.site_user }} password={{ item.site_pass }} duration=10s"
       register: bandwidth_test_output
-      with_items: "{{ csv_data.list }}" #Mengambil variabel data dari file input client sites
-      ignore_errors: yes #Apabila error/client sites rto, tetap berjalan untuk test client sites berikutnya
+      with_items: "{{ csv_data.list }}"
+      ignore_errors: yes  # Tetap lanjut ke test berikutnya meskipun ada error/RTO
 
-#    - name: Display raw bandwidth test results #Menampilkan raw bw test
-#      debug:
-#        var: bandwidth_test_output
+    # Uncomment to display raw bandwidth test results for debugging
+    # - name: Display raw bandwidth test results
+    #   debug:
+    #     var: bandwidth_test_output
 
-    - name: Write raw bandwidth test results to a file #Menyimpan raw data hasil tes ke dalam txt
+    - name: Write raw bandwidth test results to a file
       copy:
         content: "{{ item.stdout }}"
         dest: "/tmp/bandwidth_test_raw_results_{{ item.item.site_ip }}.txt"
       with_items: "{{ bandwidth_test_output.results }}"
 
-    - name: Initialize averages list #Membuat list agar dapat dibuat rata-rata dari hasil test
+    - name: Initialize averages list
       set_fact:
         averages: []
 
-    - name: Extract TX and RX averages for each site #Mengekstrak rata-rata nilai TX dan RX dari tiap client site
+    - name: Extract TX and RX averages for each site
       set_fact:
-        averages: "{{ averages + [{'site_name': item.item.site_name, 'site_ip': item.item.site_ip, 'tx_average': item.stdout | regex_findall('tx-total-average:\\s*([0-9.]+[A-Za-z]+)') | last | default('N/A'), 'rx_average': item.stdout | regex_findall('rx-total-average:\\s*([0-9.]+[A-Za-z]+)') | last | default('N/A'), 'status_average': item.stdout | regex_findall('status:\\s*([A-Za-z ]+)') | last | default('N/A') } ] }}"
+        averages: "{{ averages + [{'site_name': item.item.site_name, 'site_ip': item.item.site_ip, 'tx_average': item.stdout | regex_findall('tx-total-average:\\s*([0-9.]+[A-Za-z]+)') | last | default('N/A'), 'rx_average': item.stdout | regex_findall('rx-total-average:\\s*([0-9.]+[A-Za-z]+)') | last | default('N/A'), 'status_average': item.stdout | regex_findall('status:\\s*([A-Za-z ]+)') | last | default('N/A') }] }}"
       loop: "{{ bandwidth_test_output.results }}"
       when: item.stdout is defined
 
-    - name: Append results to CSV #Menambahkan variabel yang sudah diekstrak ke dalam report
+    - name: Append results to CSV
       lineinfile:
         path: "{{ csv_filename }}"
         line: "{{ current_timestamp }},{{ item.site_name }},{{ item.site_ip }},{{ item.tx_average }},{{ item.rx_average }},{{ item.status_average }}"
