@@ -1,0 +1,68 @@
+---
+- name: Bandwidth Test from MikroTik and Save Results
+  hosts: r-core #Setting router hosts
+  connection: network_cli
+  gather_facts: no
+  tasks:
+    - name: Initialize timestamp variable #Pengambilan timestamp untuk variabel report di dalam csv output file
+      set_fact:
+        current_timestamp: "{{ lookup('pipe', 'TZ=Asia/Jakarta date +\"%Y-%m-%d %H:%M:%S %Z\"') }}"
+
+    - name: Get current date for filename #Pengambilan tanggal untuk penamaan file report csv perhari
+      set_fact:
+        current_date: "{{ lookup('pipe', 'TZ=Asia/Jakarta date +\"%Y-%m-%d\"') }}"
+
+    - name: Set Output CSV filename #Penamaan file CSV
+      set_fact:
+        csv_filename: "./result_{{ current_date }}.csv"
+
+    - name: Read Input Client Sites #Membaca file csv berisi info client site
+      read_csv:
+        path: ./sites_router1.csv
+      register: csv_data
+
+    - name: Run bandwidth test from Router #Menjalankan tes bw dari router core
+      routeros_command:
+        commands: "/tool bandwidth-test address={{ item.site_ip }} protocol=tcp direction=both user={{ item.site_user }} password={{ item.site_pass }} duration=10s"
+      register: bandwidth_test_output
+      with_items: "{{ csv_data.list }}" #Mengambil variabel data dari file input client sites
+      ignore_errors: yes #Apabila error/client sites rto, tetap berjalan untuk test client sites berikutnya
+
+#    - name: Display raw bandwidth test results #Menampilkan raw bw test
+#      debug:
+#        var: bandwidth_test_output
+
+    - name: Write raw bandwidth test results to a file #Menyimpan raw data hasil tes ke dalam txt
+      copy:
+        content: "{{ item.stdout }}"
+        dest: "/tmp/bandwidth_test_raw_results_{{ item.item.site_ip }}.txt"
+      with_items: "{{ bandwidth_test_output.results }}"
+
+    - name: Initialize averages list #Membuat list agar dapat dibuat rata-rata dari hasil test
+      set_fact:
+        averages: []
+
+    - name: Extract TX and RX averages for each site #Mengekstrak rata-rata nilai TX dan RX dari tiap client site
+      set_fact:
+        averages: "{{ averages + [{'site_name': item.item.site_name, 'site_ip': item.item.site_ip, 'tx_average': item.stdout | regex_findall('tx-total-average:\\s*([0-9.]+[A-Za-z]+)') | last | default('N/A'), 'rx_average': item.stdout | regex_findall('rx-total-average:\\s*([0-9.]+[A-Za-z]+)') | last | default('N/A'), 'status_average': item.stdout | regex_findall('status:\\s*([A-Za-z ]+)') | last | default('N/A') } ] }}"
+      loop: "{{ bandwidth_test_output.results }}"
+      when: item.stdout is defined
+
+    - name: Check if the CSV file exists #Mengecek ketersediaan untuk report file
+      stat:
+        path: "{{ csv_filename }}"
+      register: csv_file_stat
+
+    - name: Add CSV header if file does not exist #Menambahkan header pada file csv
+      lineinfile:
+        path: "{{ csv_filename }}"
+        line: "Timestamp, Nama site, IP Address, TX Total Average, RX Total Average, Status Average"
+        create: yes
+        insertafter: EOF
+      when: not csv_file_stat.stat.exists
+
+    - name: Append results to CSV #Menambahkan variabel yang sudah diekstrak ke dalam report
+      lineinfile:
+        path: "{{ csv_filename }}"
+        line: "{{ current_timestamp }},{{ item.site_name }},{{ item.site_ip }},{{ item.tx_average }},{{ item.rx_average }},{{ item.status_average }}"
+      with_items: "{{ averages }}"
