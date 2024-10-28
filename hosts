@@ -1,9 +1,2 @@
-[router1]
+[r-core]
 172.31.254.36 ansible_network_os=routeros ansible_user=ansible-acc
-
-[router2]
-172.31.254.37 ansible_network_os=routeros ansible_user=ansible-acc
-
-#[r-core]
-#172.31.254.36 ansible_network_os=routeros ansible_user=ansible-acc
-#172.31.254.37 ansible_network_os=routeros ansible_user=ansible-acc
