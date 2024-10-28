@@ -8,11 +8,11 @@
     current_date: "{{ lookup('pipe', 'TZ=Asia/Jakarta date +\"%Y-%m-%d\"') }}"
     routers:
       "172.31.254.36":
-        csv_file: "./result_router1_{{ current_date }}.csv"
-        site_file: "./sites_router1.csv"
+        csv_file: "./result_router1_{{ current_date }}.csv" #Sesuaikan path dan format nama report router core 1 yang diinginkan
+        site_file: "./sites_router1.csv" #Sesuaikan path client sites router core 1 yang dituju
       "172.31.254.37":
-        csv_file: "./result_router2_{{ current_date }}.csv"
-        site_file: "./sites_router2.csv"
+        csv_file: "./result_router2_{{ current_date }}.csv" #Sesuaikan path dan format nama report router core 2 yang diinginkan
+        site_file: "./sites_router2.csv" #Sesuaikan path client sites router core 2 yang dituju
 
   tasks:
     - name: Set CSV and site file paths dynamically based on hostname
