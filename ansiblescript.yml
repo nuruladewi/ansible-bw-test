@@ -18,7 +18,7 @@
 
     - name: Read Input Client Sites #Membaca file csv berisi info client site
       read_csv:
-        path: ./sites_router1.csv
+        path: ./sites.csv
       register: csv_data
 
     - name: Run bandwidth test from Router #Menjalankan tes bw dari router core
