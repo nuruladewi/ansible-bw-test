@@ -1,0 +1,5 @@
+[router1]
+172.31.254.36 ansible_network_os=routeros ansible_user=ansible-acc
+
+[router2]
+172.31.254.37 ansible_network_os=routeros ansible_user=ansible-acc
