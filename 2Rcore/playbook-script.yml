@@ -62,3 +62,29 @@
         path: "{{ csv_filename }}"
         line: "{{ timestamp }},{{ item.site_name }},{{ item.site_ip }},{{ item.tx_average }},{{ item.rx_average }},{{ item.status_average }}"
       with_items: "{{ averages }}"
+
+    # Collect all CSV files for attachment dynamically
+    - name: Gather all router CSV files
+      set_fact:
+        csv_files_to_attach: "{{ csv_files_to_attach | default([]) + [routers[item].csv_file] }}"
+      loop: "{{ groups['all'] }}"
+      when: inventory_hostname in groups['all']
+
+    # Send email with both reports attached once at the end
+    - name: Send Email with Both Reports
+      community.general.mail:
+        host: smtp.gmail.com
+        port: 587
+        sender: "user@gmail.com"
+        to:
+          - FullName <user1@gmail.com>
+          - FullName <user2@mail.co.id>
+        cc: FullName <user@gmail.com>
+        subject: "Report Bandwidth Test"
+        body: |
+          Berikut ini report bandwidth test per tanggal {{ current_date }}.
+        attach: "{{ csv_files_to_attach }}"
+        username: "user@gmail.com"
+        password: "pass dari apps passw gmail"
+      delegate_to: localhost
+      run_once: true
